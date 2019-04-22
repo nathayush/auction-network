@@ -6,6 +6,7 @@
      Query Commands:
          queryLot(query)
          queryMember(query)
+         queryItem(query)
          queryAll()
 */
 
@@ -46,7 +47,8 @@ async function main() {
         const contract = network.getContract('fabcar');
 
         // Evaluate the specified transaction.
-        const result = await contract.evaluateTransaction('query');
+        // const result = await contract.evaluateTransaction('queryAll');
+        const result = await contract.evaluateTransaction('queryLot', 'MEM3');
         console.log(`Transaction has been evaluated, result is: ${result.toString()}`);
 
     } catch (error) {

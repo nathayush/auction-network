@@ -4,15 +4,16 @@
 
 /*
     Invoke Commands:
-        intiLedger()
-        createVehicle(vehicleId, ownerId)
-        createVehicleListing(listingId, reservePrice, description, state=['FOR_SALE','RESERVE_NOT_MET','SOLD'], vehicleId)
+        initLedger()
+        createItem(itemId, ownerId)
+        createItemListing(listingId, reservePrice, description, state=['FOR_SALE','RESERVE_NOT_MET','SOLD'], itemId)
         createMember(ownerId, firstname, lastname, balance)
         makeOffer(bid, listingId, memId)
         closeBidding(listingId)
     Query Commands:
         queryLot(query)
         queryMember(query)
+        queryItem(query)
         queryAll()
 */
 
@@ -41,28 +42,28 @@ class FabCar extends Contract {
         member3.firstName = 'Tom';
         member3.lastName = 'Werner';
 
-        let vehicle = {};
-        vehicle.owner = 'MEM1';
+        let item = {};
+        item.owner = 'MEM1';
 
-        let vehicleListing = {};
-        vehicleListing.reservePrice = 3500;
-        vehicleListing.description = 'Arium Nova';
-        vehicleListing.listingState = 'FOR_SALE';
-        vehicleListing.offers = '';
-        vehicleListing.vehicle = '123456';
+        let itemListing = {};
+        itemListing.reservePrice = 3500;
+        itemListing.description = 'Arium Nova';
+        itemListing.listingState = 'FOR_SALE';
+        itemListing.offers = '';
+        itemListing.item = '123456';
 
         await ctx.stub.putState('MEM1', Buffer.from(JSON.stringify(member1)));
         await ctx.stub.putState('MEM2', Buffer.from(JSON.stringify(member2)));
         await ctx.stub.putState('MEM3', Buffer.from(JSON.stringify(member3)));
-        await ctx.stub.putState('123456', Buffer.from(JSON.stringify(vehicle)));
-        await ctx.stub.putState('LOT1', Buffer.from(JSON.stringify(vehicleListing)));
+        await ctx.stub.putState('123456', Buffer.from(JSON.stringify(item)));
+        await ctx.stub.putState('LOT1', Buffer.from(JSON.stringify(itemListing)));
 
         console.info('============= END : Initialize Ledger ===========');
     }
 
-    async createVehicle(ctx, vehicleId, ownerId) {
+    async createItem(ctx, itemId, ownerId) {
       console.info('============= START : Create Item ===========');
-      if (vehicleId == null || ownerId == null) {
+      if (itemId == null || ownerId == null) {
         throw new Error('Incorrect number of arguments. Expecting 2');
       }
 
@@ -70,25 +71,25 @@ class FabCar extends Contract {
         owner: ownerId
       };
 
-      await ctx.stub.putState(vehicleId, Buffer.from(JSON.stringify(car)));
+      await ctx.stub.putState(itemId, Buffer.from(JSON.stringify(car)));
       console.info('============= END : Create Item ===========');
     }
 
-    async createVehicleListing(ctx, listingId, reservePrice, description, listingState, vehicleId) {
+    async createItemListing(ctx, listingId, reservePrice, description, listingState, itemId) {
       console.info('============= START : Create Listing ===========');
-      if (listingId == null || reservePrice == null || description == null || listingState == null || vehicleId == null) {
+      if (listingId == null || reservePrice == null || description == null || listingState == null || itemId == null) {
         throw new Error('Incorrect number of arguments. Expecting 6');
       }
 
-      var vehicleListing = {
+      var itemListing = {
         reservePrice: reservePrice,
         description: description,
         listingState: listingState,
         offers: null,
-        vehicle: vehicleId
+        item: itemId
       };
 
-      await ctx.stub.putState(listingId, Buffer.from(JSON.stringify(vehicleListing)));
+      await ctx.stub.putState(listingId, Buffer.from(JSON.stringify(itemListing)));
       console.info('============= END : Create Listing ===========');
     }
 
@@ -134,6 +135,23 @@ class FabCar extends Contract {
       }
 
       let queryAsBytes = await ctx.stub.getState(query); //get the car from chaincode state
+      if (!queryAsBytes || queryAsBytes.toString().length <= 0) {
+        throw new Error('key does not exist: ');
+      }
+      console.info('query response: ');
+      console.info(queryAsBytes.toString());
+      console.info('============= END : Query method ===========');
+
+      return queryAsBytes.toString();
+    }
+
+    async queryItem(ctx, query) {
+      console.info('============= START : Query method ===========');
+      if (query == null) {
+        throw new Error('Incorrect number of arguments. Expecting 1');
+      }
+
+      let queryAsBytes = await ctx.stub.getState(query);
       if (!queryAsBytes || queryAsBytes.toString().length <= 0) {
         throw new Error('key does not exist: ');
       }
@@ -229,13 +247,13 @@ class FabCar extends Contract {
       }
       listing = JSON.parse(listingAsBytes);
 
-      //get reference to vehicle, to update it's owner later
-      let vehicleAsBytes = await ctx.stub.getState(listing.vehicle);
-      if (!vehicleAsBytes || vehicleAsBytes.toString().length <= 0) {
+      //get reference to item, to update it's owner later
+      let itemAsBytes = await ctx.stub.getState(listing.item);
+      if (!itemAsBytes || itemAsBytes.toString().length <= 0) {
         throw new Error('item does not exist');
       }
 
-      let vehicle = JSON.parse(vehicleAsBytes);
+      let item = JSON.parse(itemAsBytes);
 
       //get reference to member to ensure enough balance in their account to make the bid
       let memberAsBytes = await ctx.stub.getState(offer.member);
@@ -250,13 +268,13 @@ class FabCar extends Contract {
       }
 
       console.info('item: ');
-      console.info(util.inspect(vehicle, { showHidden: false, depth: null }));
+      console.info(util.inspect(item, { showHidden: false, depth: null }));
       console.info('offer: ');
       console.info(util.inspect(offer, { showHidden: false, depth: null }));
 
 
       //check to ensure bidder can't bid on own item!
-      if (vehicle.owner == offer.member) {
+      if (item.owner == offer.member) {
         throw new Error('owner cannot bid on own item.');
       }
 
@@ -296,6 +314,7 @@ class FabCar extends Contract {
       console.info(util.inspect(listing, { showHidden: false, depth: null }));
       listing.listingState = 'RESERVE_NOT_MET';
       let highestOffer = null;
+      let secondHighestOffer = null;
       console.log('3')
       //can only close bidding if there are offers
       if (listing.offers && listing.offers.length > 1) {
@@ -314,7 +333,7 @@ class FabCar extends Contract {
           console.log('5')
           console.info('highestOffer.member: ' + buyer);
 
-          //get the buyer or highest bidder on the vehicle
+          //get the buyer or highest bidder on the item
           let buyerAsBytes = await ctx.stub.getState(buyer);
           if (!buyerAsBytes || buyerAsBytes.toString().length <= 0) {
             throw new Error('buyer does not exist in network');
@@ -325,15 +344,15 @@ class FabCar extends Contract {
           console.info(util.inspect(buyer, { showHidden: false, depth: null }));
           console.log('7')
 
-          //get reference to vehicle
-          let vehicleAsBytes = await ctx.stub.getState(listing.vehicle);
-          if (!vehicleAsBytes || vehicleAsBytes.toString().length <= 0) {
+          //get reference to item
+          let itemAsBytes = await ctx.stub.getState(listing.item);
+          if (!itemAsBytes || itemAsBytes.toString().length <= 0) {
             throw new Error('item does not exist');
           }
           console.log('8')
-          var vehicle = JSON.parse(vehicleAsBytes);
-          //get reference to the seller - or owner of vehicle
-          let sellerAsBytes = await ctx.stub.getState(vehicle.owner);
+          var item = JSON.parse(itemAsBytes);
+          //get reference to the seller - or owner of item
+          let sellerAsBytes = await ctx.stub.getState(item.owner);
           if (!sellerAsBytes || sellerAsBytes.toString().length <= 0) {
             throw new Error('Seller does not exist in network');
           }
@@ -344,7 +363,7 @@ class FabCar extends Contract {
           console.info(util.inspect(seller, { showHidden: false, depth: null }));
 
           console.info('#### seller balance before: ' + seller.balance);
-          console.info('#### buyer balance before: ' + buyerBalance);
+          console.info('#### buyer balance before: ' + buyer.balance);
           //ensure all strings get converted to ints
           let sellerBalance = parseInt(seller.balance, 10);
           let secondHighOfferBidPrice = parseInt(secondHighestOffer.bidPrice, 10);
@@ -354,13 +373,13 @@ class FabCar extends Contract {
           seller.balance = sellerBalance;
           buyerBalance -= secondHighestOffer.bidPrice;
           buyer.balance = buyerBalance;
-          let oldOwner = vehicle.owner;
-          vehicle.owner = highestOffer.member;
+          let oldOwner = item.owner;
+          item.owner = highestOffer.member;
 
           console.info('#### seller balance after: ' + seller.balance);
           console.info('#### buyer balance after: ' + buyerBalance);
-          console.info('#### vehicle owner before: ' + vehicle.owner);
-          console.info('#### vehicle owner after: ' + vehicle.owner);
+          console.info('#### item owner before: ' + item.owner);
+          console.info('#### item owner after: ' + item.owner);
           console.info('#### buyer balance after: ' + buyerBalance);
           listing.offers = null;
           listing.listingState = 'SOLD';
@@ -386,7 +405,7 @@ class FabCar extends Contract {
           console.log('5')
           console.info('highestOffer.member: ' + buyer);
 
-          //get the buyer or highest bidder on the vehicle
+          //get the buyer or highest bidder on the item
           let buyerAsBytes = await ctx.stub.getState(buyer);
           if (!buyerAsBytes || buyerAsBytes.toString().length <= 0) {
             throw new Error('buyer does not exist in network');
@@ -397,15 +416,15 @@ class FabCar extends Contract {
           console.info(util.inspect(buyer, { showHidden: false, depth: null }));
           console.log('7')
 
-          //get reference to vehicle
-          let vehicleAsBytes = await ctx.stub.getState(listing.vehicle);
-          if (!vehicleAsBytes || vehicleAsBytes.toString().length <= 0) {
+          //get reference to item
+          let itemAsBytes = await ctx.stub.getState(listing.item);
+          if (!itemAsBytes || itemAsBytes.toString().length <= 0) {
             throw new Error('item does not exist');
           }
           console.log('8')
-          var vehicle = JSON.parse(vehicleAsBytes);
-          //get reference to the seller - or owner of vehicle
-          let sellerAsBytes = await ctx.stub.getState(vehicle.owner);
+          var item = JSON.parse(itemAsBytes);
+          //get reference to the seller - or owner of item
+          let sellerAsBytes = await ctx.stub.getState(item.owner);
           if (!sellerAsBytes || sellerAsBytes.toString().length <= 0) {
             throw new Error('Seller does not exist in network');
           }
@@ -416,7 +435,7 @@ class FabCar extends Contract {
           console.info(util.inspect(seller, { showHidden: false, depth: null }));
 
           console.info('#### seller balance before: ' + seller.balance);
-          console.info('#### buyer balance before: ' + buyerBalance);
+          console.info('#### buyer balance before: ' + buyer.balance);
           //ensure all strings get converted to ints
           let sellerBalance = parseInt(seller.balance, 10);
           let highOfferBidPrice = parseInt(highestOffer.bidPrice, 10);
@@ -426,13 +445,13 @@ class FabCar extends Contract {
           seller.balance = sellerBalance;
           buyerBalance -= highestOffer.bidPrice;
           buyer.balance = buyerBalance;
-          let oldOwner = vehicle.owner;
-          vehicle.owner = highestOffer.member;
+          let oldOwner = item.owner;
+          item.owner = highestOffer.member;
 
           console.info('#### seller balance after: ' + seller.balance);
           console.info('#### buyer balance after: ' + buyerBalance);
-          console.info('#### vehicle owner before: ' + vehicle.owner);
-          console.info('#### vehicle owner after: ' + vehicle.owner);
+          console.info('#### item owner before: ' + item.owner);
+          console.info('#### item owner after: ' + item.owner);
           console.info('#### buyer balance after: ' + buyerBalance);
           listing.offers = null;
           listing.listingState = 'SOLD';
@@ -446,11 +465,11 @@ class FabCar extends Contract {
         }
       }
       console.info('inspecting item: ');
-      console.info(util.inspect(vehicle, { showHidden: false, depth: null }));
+      console.info(util.inspect(item, { showHidden: false, depth: null }));
       console.log('12')
       if (highestOffer) {
-        //update the owner of the vehicle
-        await ctx.stub.putState(listing.vehicle, Buffer.from(JSON.stringify(vehicle)));
+        //update the owner of the item
+        await ctx.stub.putState(listing.item, Buffer.from(JSON.stringify(item)));
       } else { throw new Error('offers do not exist: '); }
       console.log('13')
       console.info('============= END : closeBidding ===========');
