@@ -47,8 +47,8 @@ async function main() {
         const contract = network.getContract('fabcar');
 
         // Evaluate the specified transaction.
-        // const result = await contract.evaluateTransaction('queryAll');
-        const result = await contract.evaluateTransaction('queryLot', 'MEM3');
+        const result = await contract.evaluateTransaction('queryAll');
+        // const result = await contract.evaluateTransaction('queryLot', 'LOT3');
         console.log(`Transaction has been evaluated, result is: ${result.toString()}`);
 
     } catch (error) {

@@ -5,8 +5,7 @@
 /*
     Invoke Commands:
         initLedger()
-        createItem(itemId, ownerId)
-        createItemListing(listingId, reservePrice, description, state=['FOR_SALE','RESERVE_NOT_MET','SOLD'], itemId)
+        createListing(ownerId, listingId, reservePrice, description)
         createMember(ownerId, firstname, lastname, balance)
         makeOffer(bid, listingId, memId)
         closeBidding(listingId)
@@ -42,51 +41,34 @@ class FabCar extends Contract {
         member3.firstName = 'Tom';
         member3.lastName = 'Werner';
 
-        let item = {};
-        item.owner = 'MEM1';
-
-        let itemListing = {};
-        itemListing.reservePrice = 3500;
-        itemListing.description = 'Arium Nova';
-        itemListing.listingState = 'FOR_SALE';
-        itemListing.offers = '';
-        itemListing.item = '123456';
+        let lot1 = {};
+        lot1.owner = 'MEM1';
+        lot1.reservePrice = 3500;
+        lot1.description = 'Arium Nova';
+        lot1.listingState = 'FOR_SALE';
+        lot1.offers = '';
+        lot1.item = 'item1';
 
         await ctx.stub.putState('MEM1', Buffer.from(JSON.stringify(member1)));
         await ctx.stub.putState('MEM2', Buffer.from(JSON.stringify(member2)));
         await ctx.stub.putState('MEM3', Buffer.from(JSON.stringify(member3)));
-        await ctx.stub.putState('123456', Buffer.from(JSON.stringify(item)));
-        await ctx.stub.putState('LOT1', Buffer.from(JSON.stringify(itemListing)));
+        await ctx.stub.putState('LOT1', Buffer.from(JSON.stringify(lot1)));
 
         console.info('============= END : Initialize Ledger ===========');
     }
 
-    async createItem(ctx, itemId, ownerId) {
-      console.info('============= START : Create Item ===========');
-      if (itemId == null || ownerId == null) {
-        throw new Error('Incorrect number of arguments. Expecting 2');
-      }
-
-      var car = {
-        owner: ownerId
-      };
-
-      await ctx.stub.putState(itemId, Buffer.from(JSON.stringify(car)));
-      console.info('============= END : Create Item ===========');
-    }
-
-    async createItemListing(ctx, listingId, reservePrice, description, listingState, itemId) {
+    async createListing(ctx, ownerId, listingId, reservePrice, description) {
       console.info('============= START : Create Listing ===========');
-      if (listingId == null || reservePrice == null || description == null || listingState == null || itemId == null) {
-        throw new Error('Incorrect number of arguments. Expecting 6');
+      if (ownerId == null || listingId == null || reservePrice == null || description == null) {
+        throw new Error('Incorrect number of arguments. Expecting 4');
       }
 
       var itemListing = {
+        owner: ownerId
         reservePrice: reservePrice,
         description: description,
-        listingState: listingState,
-        offers: null,
-        item: itemId
+        listingState: 'FOR_SALE',
+        offers: null
       };
 
       await ctx.stub.putState(listingId, Buffer.from(JSON.stringify(itemListing)));
@@ -135,23 +117,6 @@ class FabCar extends Contract {
       }
 
       let queryAsBytes = await ctx.stub.getState(query); //get the car from chaincode state
-      if (!queryAsBytes || queryAsBytes.toString().length <= 0) {
-        throw new Error('key does not exist: ');
-      }
-      console.info('query response: ');
-      console.info(queryAsBytes.toString());
-      console.info('============= END : Query method ===========');
-
-      return queryAsBytes.toString();
-    }
-
-    async queryItem(ctx, query) {
-      console.info('============= START : Query method ===========');
-      if (query == null) {
-        throw new Error('Incorrect number of arguments. Expecting 1');
-      }
-
-      let queryAsBytes = await ctx.stub.getState(query);
       if (!queryAsBytes || queryAsBytes.toString().length <= 0) {
         throw new Error('key does not exist: ');
       }
@@ -247,14 +212,6 @@ class FabCar extends Contract {
       }
       listing = JSON.parse(listingAsBytes);
 
-      //get reference to item, to update it's owner later
-      let itemAsBytes = await ctx.stub.getState(listing.item);
-      if (!itemAsBytes || itemAsBytes.toString().length <= 0) {
-        throw new Error('item does not exist');
-      }
-
-      let item = JSON.parse(itemAsBytes);
-
       //get reference to member to ensure enough balance in their account to make the bid
       let memberAsBytes = await ctx.stub.getState(offer.member);
       if (!memberAsBytes || memberAsBytes.toString().length <= 0) {
@@ -267,21 +224,18 @@ class FabCar extends Contract {
         throw new Error('The bid is higher than the balance in your account!');
       }
 
-      console.info('item: ');
-      console.info(util.inspect(item, { showHidden: false, depth: null }));
       console.info('offer: ');
       console.info(util.inspect(offer, { showHidden: false, depth: null }));
 
-
       //check to ensure bidder can't bid on own item!
-      if (item.owner == offer.member) {
+      if (listing.owner == offer.member) {
         throw new Error('owner cannot bid on own item.');
       }
 
       console.info('listing response before pushing to offers: ');
       console.info(listing);
       if (!listing.offers) {
-        console.info('there are no offers! ');
+        console.info('there are no offers.');
         listing.offers = [];
       }
       listing.offers.push(offer);
@@ -300,14 +254,13 @@ class FabCar extends Contract {
       }
 
       let listingKey = listingId;
-      console.log('1')
+
       //check if listing exists
       let listingAsBytes = await ctx.stub.getState(listingKey);
       if (!listingAsBytes || listingAsBytes.toString().length <= 0) {
-        throw new Error('listing does not exist: ');
+        throw new Error('listing does not exist.');
       }
       console.info('============= listing exists ===========');
-      console.log('2')
 
       var listing = JSON.parse(listingAsBytes);
       console.info('listing: ');
@@ -315,13 +268,13 @@ class FabCar extends Contract {
       listing.listingState = 'RESERVE_NOT_MET';
       let highestOffer = null;
       let secondHighestOffer = null;
-      console.log('3')
+
       //can only close bidding if there are offers
       if (listing.offers && listing.offers.length > 1) {
         listing.offers.sort(function (a, b) {
           return (b.bidPrice - a.bidPrice);
         });
-        console.log('4')
+
         highestOffer = listing.offers[0];
         secondHighestOffer = listing.offers[1];
         console.info('highest Offer: ' + highestOffer);
@@ -330,33 +283,21 @@ class FabCar extends Contract {
         //bid must be higher than reserve price, otherwise we can sell the car
         if (highestOffer.bidPrice >= listing.reservePrice) {
           let buyer = highestOffer.member;
-          console.log('5')
           console.info('highestOffer.member: ' + buyer);
 
           //get the buyer or highest bidder on the item
           let buyerAsBytes = await ctx.stub.getState(buyer);
           if (!buyerAsBytes || buyerAsBytes.toString().length <= 0) {
-            throw new Error('buyer does not exist in network');
+            throw new Error('buyer does not exist in the network');
           }
-          console.log('6')
           buyer = JSON.parse(buyerAsBytes);
           console.info('buyer: ');
           console.info(util.inspect(buyer, { showHidden: false, depth: null }));
-          console.log('7')
 
-          //get reference to item
-          let itemAsBytes = await ctx.stub.getState(listing.item);
-          if (!itemAsBytes || itemAsBytes.toString().length <= 0) {
-            throw new Error('item does not exist');
-          }
-          console.log('8')
-          var item = JSON.parse(itemAsBytes);
-          //get reference to the seller - or owner of item
-          let sellerAsBytes = await ctx.stub.getState(item.owner);
+          let sellerAsBytes = await ctx.stub.getState(listing.owner);
           if (!sellerAsBytes || sellerAsBytes.toString().length <= 0) {
             throw new Error('Seller does not exist in network');
           }
-          console.log('9')
           let seller = JSON.parse(sellerAsBytes);
 
           console.info('seller: ');
@@ -368,22 +309,22 @@ class FabCar extends Contract {
           let sellerBalance = parseInt(seller.balance, 10);
           let secondHighOfferBidPrice = parseInt(secondHighestOffer.bidPrice, 10);
           let buyerBalance = parseInt(buyer.balance, 10);
-          console.log('10')
+
           sellerBalance += secondHighOfferBidPrice;
           seller.balance = sellerBalance;
           buyerBalance -= secondHighestOffer.bidPrice;
           buyer.balance = buyerBalance;
-          let oldOwner = item.owner;
-          item.owner = highestOffer.member;
+          let oldOwner = listing.owner;
+          listing.owner = highestOffer.member;
 
           console.info('#### seller balance after: ' + seller.balance);
           console.info('#### buyer balance after: ' + buyerBalance);
-          console.info('#### item owner before: ' + item.owner);
-          console.info('#### item owner after: ' + item.owner);
+          console.info('#### lot owner before: ' + listing.owner);
+          console.info('#### lot owner after: ' + listing.owner);
           console.info('#### buyer balance after: ' + buyerBalance);
           listing.offers = null;
           listing.listingState = 'SOLD';
-          console.log('11')
+
           //update the balance of the buyer
           await ctx.stub.putState(highestOffer.member, Buffer.from(JSON.stringify(buyer)));
           //update the balance of the seller
@@ -395,14 +336,13 @@ class FabCar extends Contract {
         listing.offers.sort(function (a, b) {
           return (b.bidPrice - a.bidPrice);
         });
-        console.log('4')
+
         highestOffer = listing.offers[0];
         console.info('highest Offer: ' + highestOffer);
 
         //bid must be higher than reserve price, otherwise we can sell the car
         if (highestOffer.bidPrice >= listing.reservePrice) {
           let buyer = highestOffer.member;
-          console.log('5')
           console.info('highestOffer.member: ' + buyer);
 
           //get the buyer or highest bidder on the item
@@ -410,25 +350,14 @@ class FabCar extends Contract {
           if (!buyerAsBytes || buyerAsBytes.toString().length <= 0) {
             throw new Error('buyer does not exist in network');
           }
-          console.log('6')
           buyer = JSON.parse(buyerAsBytes);
           console.info('buyer: ');
           console.info(util.inspect(buyer, { showHidden: false, depth: null }));
-          console.log('7')
 
-          //get reference to item
-          let itemAsBytes = await ctx.stub.getState(listing.item);
-          if (!itemAsBytes || itemAsBytes.toString().length <= 0) {
-            throw new Error('item does not exist');
-          }
-          console.log('8')
-          var item = JSON.parse(itemAsBytes);
-          //get reference to the seller - or owner of item
-          let sellerAsBytes = await ctx.stub.getState(item.owner);
+          let sellerAsBytes = await ctx.stub.getState(listing.owner);
           if (!sellerAsBytes || sellerAsBytes.toString().length <= 0) {
             throw new Error('Seller does not exist in network');
           }
-          console.log('9')
           let seller = JSON.parse(sellerAsBytes);
 
           console.info('seller: ');
@@ -440,22 +369,22 @@ class FabCar extends Contract {
           let sellerBalance = parseInt(seller.balance, 10);
           let highOfferBidPrice = parseInt(highestOffer.bidPrice, 10);
           let buyerBalance = parseInt(buyer.balance, 10);
-          console.log('10')
+
           sellerBalance += highOfferBidPrice;
           seller.balance = sellerBalance;
           buyerBalance -= highestOffer.bidPrice;
           buyer.balance = buyerBalance;
-          let oldOwner = item.owner;
-          item.owner = highestOffer.member;
+          let oldOwner = listing.owner;
+          listing.owner = highestOffer.member;
 
           console.info('#### seller balance after: ' + seller.balance);
           console.info('#### buyer balance after: ' + buyerBalance);
-          console.info('#### item owner before: ' + item.owner);
-          console.info('#### item owner after: ' + item.owner);
+          console.info('#### item owner before: ' + listing.owner);
+          console.info('#### item owner after: ' + listing.owner);
           console.info('#### buyer balance after: ' + buyerBalance);
           listing.offers = null;
           listing.listingState = 'SOLD';
-          console.log('11')
+
           //update the balance of the buyer
           await ctx.stub.putState(highestOffer.member, Buffer.from(JSON.stringify(buyer)));
           //update the balance of the seller
@@ -464,14 +393,13 @@ class FabCar extends Contract {
           await ctx.stub.putState(listingKey, Buffer.from(JSON.stringify(listing)));
         }
       }
-      console.info('inspecting item: ');
-      console.info(util.inspect(item, { showHidden: false, depth: null }));
-      console.log('12')
-      if (highestOffer) {
-        //update the owner of the item
-        await ctx.stub.putState(listing.item, Buffer.from(JSON.stringify(item)));
-      } else { throw new Error('offers do not exist: '); }
-      console.log('13')
+      console.info('inspecting lot: ');
+      console.info(util.inspect(listing, { showHidden: false, depth: null }));
+
+      if (!highestOffer) {
+        throw new Error('no offers exist');
+      }
+
       console.info('============= END : closeBidding ===========');
     }
 }

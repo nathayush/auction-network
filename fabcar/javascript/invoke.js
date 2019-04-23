@@ -49,11 +49,11 @@ async function main() {
         const contract = network.getContract('fabcar');
 
         // Submit the specified transaction.
-        // await contract.submitTransaction('initLedger');
+        await contract.submitTransaction('initLedger');
         // await contract.submitTransaction('createItem', '234567', 'MEM2');
         // await contract.submitTransaction('createItemListing', 'LOT4', '2000', 'Honda Civic', 'FOR_SALE', '234567');
         // await contract.submitTransaction('makeOffer', '4500', 'LOT1', 'MEM3');
-        await contract.submitTransaction('closeBidding', 'LOT1');
+        // await contract.submitTransaction('closeBidding', 'LOT1');
         console.log('Transaction has been submitted');
 
         // Disconnect from the gateway.
