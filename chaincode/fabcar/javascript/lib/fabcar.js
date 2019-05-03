@@ -5,14 +5,13 @@
 /*
     Invoke Commands:
         initLedger()
-        createListing(ownerId, listingId, reservePrice, description)
-        createMember(ownerId, firstname, lastname, balance)
+        addMemToState(firstname, lastname, balance, ownerId)
+        createListing(reservePrice, description, ownerId)
         makeOffer(bid, listingId, memId)
         closeBidding(listingId)
     Query Commands:
         queryLot(query)
         queryMember(query)
-        queryItem(query)
         queryAll()
 */
 
@@ -26,57 +25,33 @@ class FabCar extends Contract {
     async initLedger(ctx) {
         console.info('============= START : Initialize Ledger ===========');
 
-        let member1 = {};
-        member1.balance = 5000;
-        member1.firstName = 'Amy';
-        member1.lastName = 'Williams';
+        // let member1 = {};
+        // member1.balance = 5000;
+        // member1.firstName = 'Amy';
+        // member1.lastName = 'Williams';
 
-        let member2 = {};
-        member2.balance = 5000;
-        member2.firstName = 'Billy';
-        member2.lastName = 'Thompson';
+        // let lot1 = {};
+        // lot1.owner = 'MEM1';
+        // lot1.reservePrice = 3500;
+        // lot1.description = 'Arium Nova';
+        // lot1.listingState = 'FOR_SALE';
+        // lot1.offers = '';
+        // lot1.item = 'item1';
 
-        let member3 = {};
-        member3.balance = 5000;
-        member3.firstName = 'Tom';
-        member3.lastName = 'Werner';
+        let lotCount = {};
+        lotCount.count = 0;
 
-        let lot1 = {};
-        lot1.owner = 'MEM1';
-        lot1.reservePrice = 3500;
-        lot1.description = 'Arium Nova';
-        lot1.listingState = 'FOR_SALE';
-        lot1.offers = '';
-        lot1.item = 'item1';
+        let memCount = {};
+        memCount.count = 0;
 
-        await ctx.stub.putState('MEM1', Buffer.from(JSON.stringify(member1)));
-        await ctx.stub.putState('MEM2', Buffer.from(JSON.stringify(member2)));
-        await ctx.stub.putState('MEM3', Buffer.from(JSON.stringify(member3)));
-        await ctx.stub.putState('LOT1', Buffer.from(JSON.stringify(lot1)));
+        await ctx.stub.putState('lotCount', Buffer.from(JSON.stringify(lotCount)));
+        await ctx.stub.putState('memCount', Buffer.from(JSON.stringify(memCount)));
 
         console.info('============= END : Initialize Ledger ===========');
     }
 
-    async createListing(ctx, ownerId, listingId, reservePrice, description) {
-      console.info('============= START : Create Listing ===========');
-      if (ownerId == null || listingId == null || reservePrice == null || description == null) {
-        throw new Error('Incorrect number of arguments. Expecting 4');
-      }
-
-      var itemListing = {
-        owner: ownerId
-        reservePrice: reservePrice,
-        description: description,
-        listingState: 'FOR_SALE',
-        offers: null
-      };
-
-      await ctx.stub.putState(listingId, Buffer.from(JSON.stringify(itemListing)));
-      console.info('============= END : Create Listing ===========');
-    }
-
-    async createMember(ctx, memberId, firstName, lastName, balance) {
-      console.info('============= START : Create Member ===========');
+    async addMemToState(ctx, firstName, lastName, balance, memberId) {
+      console.info('============= START : Add Member to State ===========');
       if (memberId == null || firstName == null || lastName == null || balance == null) {
         throw new Error('Incorrect number of arguments. Expecting 4');
       }
@@ -90,7 +65,39 @@ class FabCar extends Contract {
       console.info(member);
 
       await ctx.stub.putState(memberId, Buffer.from(JSON.stringify(member)));
-      console.info('============= END : Create Member ===========');
+
+      let countAsBytes = await ctx.stub.getState('memCount');
+      var memCount = JSON.parse(countAsBytes);
+      memCount.count = memCount.count + 1;
+      await ctx.stub.putState('memCount', Buffer.from(JSON.stringify(memCount)));
+
+      console.info('============= END : Add Member to State ===========');
+    }
+
+    async createListing(ctx, reservePrice, description, ownerId) {
+      console.info('============= START : Create Listing ===========');
+      if (ownerId == null || reservePrice == null || description == null) {
+        throw new Error('Incorrect number of arguments. Expecting 4');
+      }
+
+      var itemListing = {
+        owner: ownerId,
+        reservePrice: reservePrice,
+        description: description,
+        listingState: 'FOR_SALE',
+        offers: null
+      };
+
+      let countAsBytes = await ctx.stub.getState('lotCount');
+      var lotCount = JSON.parse(countAsBytes);
+      lotCount.count = lotCount.count + 1;
+
+      var listingId = "LOT" + lotCount.count.toString();
+
+      await ctx.stub.putState(listingId, Buffer.from(JSON.stringify(itemListing)));
+      await ctx.stub.putState('lotCount', Buffer.from(JSON.stringify(lotCount)));
+
+      console.info('============= END : Create Listing ===========');
     }
 
     async queryLot(ctx, query) {
@@ -127,6 +134,52 @@ class FabCar extends Contract {
       return queryAsBytes.toString();
     }
 
+    // async queryMemberOffers(ctx, query) {
+    //   console.info('============= START : Query method ===========');
+    //   const startLot = 'LOT0';
+    //   const endLot = 'LOT999';
+    //
+    //   const lotIterator = await ctx.stub.getStateByRange(startLot, endLot);
+    //
+    //   const allResults = [];
+    //   while (true) {
+    //     const res = await lotIterator.next();
+    //
+    //     if (res.value && res.value.value.toString()) {
+    //       console.log(res.value.value.toString('utf8'));
+    //
+    //       const Key = res.value.key;
+    //       let Record;
+    //       try {
+    //         var listing = JSON.parse(res.value.value.toString('utf8'));
+    //         if (listing.offers && listing.offers.length > 0) {
+    //           listing.offers.sort(function (a, b) {
+    //             return (b.bidPrice - a.bidPrice);
+    //           });
+    //
+    //           function getRank(value, index, array) {
+    //             if (value.member == query) {
+    //               allResults.push({Key, "Rank " + index.toString()})
+    //             }
+    //           }
+    //           listing.offers.forEach(myFunction);
+    //         }
+    //       } catch (err) {
+    //         console.log(err);
+    //       }
+    //     }
+    //     if (res.done) {
+    //       await lotIterator.close();
+    //       break;
+    //     }
+    //   }
+    //   console.log('end of data');
+    //   console.info(allResults);
+    //   console.info('============= END : Query method ===========');
+    //
+    //   return JSON.stringify(allResults);
+    // }
+
     async queryAll(ctx) {
       console.info('============= START : Query method ===========');
       const startLot = 'LOT0';
@@ -153,33 +206,6 @@ class FabCar extends Contract {
         }
         if (res.done) {
           await lotIterator.close();
-          break;
-        }
-      }
-
-      const startMem = 'MEM0';
-      const endMem = 'MEM999';
-
-      const memIterator = await ctx.stub.getStateByRange(startMem, endMem);
-
-      while (true) {
-        const res = await memIterator.next();
-
-        if (res.value && res.value.value.toString()) {
-          console.log(res.value.value.toString('utf8'));
-
-          const Key = res.value.key;
-          let Record;
-          try {
-            Record = JSON.parse(res.value.value.toString('utf8'));
-          } catch (err) {
-            console.log(err);
-            Record = res.value.value.toString('utf8');
-          }
-          allResults.push({ Key, Record });
-        }
-        if (res.done) {
-          await memIterator.close();
           break;
         }
       }
@@ -215,7 +241,7 @@ class FabCar extends Contract {
       //get reference to member to ensure enough balance in their account to make the bid
       let memberAsBytes = await ctx.stub.getState(offer.member);
       if (!memberAsBytes || memberAsBytes.toString().length <= 0) {
-        throw new Error('member does not exist');
+        throw new Error('member does not queryexist');
       }
       let member = JSON.parse(memberAsBytes);
 
@@ -240,11 +266,23 @@ class FabCar extends Contract {
       }
       listing.offers.push(offer);
 
+      var result = '';
+      if (listing.offers && listing.offers.length > 0) {
+        listing.offers.sort(function (a, b) {
+          return (b.bidPrice - a.bidPrice);
+        });
+        listing.offers.forEach(function (value, index) {
+          if (value.member == offer.member) {
+            result = "rank in this lot's bids: " + (Number(index)+1).toString();
+          }
+        });
+      }
+
       console.info('listing response after pushing to offers: ');
       console.info(listing);
       await ctx.stub.putState(listingId, Buffer.from(JSON.stringify(listing)));
-
       console.info('============= END : Make Offer ===========');
+      return result;
     }
 
     async closeBidding(ctx, listingId) {

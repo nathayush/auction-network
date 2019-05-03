@@ -5,10 +5,9 @@
 /*
      Invoke Commands:
          initLedger()
-         createItem(itemId, ownerId)
-            createItemListing(listingId, reservePrice, description, state=['FOR_SALE','RESERVE_NOT_MET','SOLD'], itemId)
-         createMember(ownerId, firstname, lastname, balance)
-         makeOffer(bid, listingId, memId)
+         addMemToState(firstname, lastname, balance, [ownerId])
+         createListing(reservePrice, description, [ownerId])
+         makeOffer(bid, listingId, [memId])
          closeBidding(listingId)
 */
 
@@ -22,6 +21,12 @@ const ccpPath = path.resolve(__dirname, '..', '..', 'basic-network', 'connection
 const ccpJSON = fs.readFileSync(ccpPath, 'utf8');
 const ccp = JSON.parse(ccpJSON);
 
+let user;
+process.argv.forEach(function (val,index,array) {
+    console.log(index + ': '+ val);
+    user = array[2];
+});
+
 async function main() {
     try {
 
@@ -31,16 +36,16 @@ async function main() {
         console.log(`Wallet path: ${walletPath}`);
 
         // Check to see if we've already enrolled the user.
-        const userExists = await wallet.exists('user1');
+        const userExists = await wallet.exists(user);
         if (!userExists) {
-            console.log('An identity for the user "user1" does not exist in the wallet');
+            console.log('An identity for the user ${user} does not exist in the wallet');
             console.log('Run the registerUser.js application before retrying');
             return;
         }
 
         // Create a new gateway for connecting to our peer node.
         const gateway = new Gateway();
-        await gateway.connect(ccp, { wallet, identity: 'user1', discovery: { enabled: false } });
+        await gateway.connect(ccp, { wallet, identity: user, discovery: { enabled: false } });
 
         // Get the network (channel) our contract is deployed to.
         const network = await gateway.getNetwork('mychannel');
@@ -49,12 +54,13 @@ async function main() {
         const contract = network.getContract('fabcar');
 
         // Submit the specified transaction.
-        await contract.submitTransaction('initLedger');
-        // await contract.submitTransaction('createItem', '234567', 'MEM2');
-        // await contract.submitTransaction('createItemListing', 'LOT4', '2000', 'Honda Civic', 'FOR_SALE', '234567');
-        // await contract.submitTransaction('makeOffer', '4500', 'LOT1', 'MEM3');
+        // await contract.submitTransaction('addMemToState', 'Vineet', 'Nandkishore', '5000', user);
+        // await contract.submitTransaction('createListing', '2000', 'Honda Civic', user);
+        // await contract.submitTransaction('makeOffer', '4000', 'LOT1', user);
         // await contract.submitTransaction('closeBidding', 'LOT1');
-        console.log('Transaction has been submitted');
+        const result = await contract.submitTransaction('makeOffer', '3000', 'LOT1', user);
+        console.log(`Transaction has been submitted, result is: ${result}`);
+        // console.log('Transaction has been submitted');
 
         // Disconnect from the gateway.
         await gateway.disconnect();
