@@ -321,7 +321,11 @@ class FabCar extends Contract {
       console.info(util.inspect(listing, { showHidden: false, depth: null }));
       listing.listingState = 'RESERVE_NOT_MET';
 
-      //first return everyone's money in offers
+      if (!(listing.owner == ownerId)) {
+        throw new Error('Permission denied.');
+      }
+
+      //first restore everyone's balance in offers
       if (listing.offers && listing.offers.length > 0) {
         for (let i=0; i<listing.offers.length; i++) {
           let offerMember = listing.offers[i].member;
@@ -333,7 +337,6 @@ class FabCar extends Contract {
           }
           offerMember = JSON.parse(memAsBytes);
           offerMember.balance += offerBid;
-          console.info(util.inspect(JSON.parse(offerMember), { showHidden: false, depth: null })););
           await ctx.stub.putState(listing.offers[i].member, Buffer.from(JSON.stringify(offerMember)));
         }
       }
@@ -389,6 +392,7 @@ class FabCar extends Contract {
 
           sellerBalance += secondHighOfferBidPrice;
           seller.balance = sellerBalance;
+          buyerBalance += highestOffer.bidPrice; //restore balance before deducting
           buyerBalance -= secondHighestOffer.bidPrice;
           buyer.balance = buyerBalance;
           let oldOwner = listing.owner;
@@ -448,6 +452,7 @@ class FabCar extends Contract {
 
           sellerBalance += highOfferBidPrice;
           seller.balance = sellerBalance;
+          buyerBalance += highestOffer.bidPrice; //restore balance before deducting
           buyerBalance -= highestOffer.bidPrice;
           buyer.balance = buyerBalance;
           let oldOwner = listing.owner;
@@ -468,11 +473,11 @@ class FabCar extends Contract {
           await ctx.stub.putState(listingKey, Buffer.from(JSON.stringify(listing)));
         }
       }
-      console.info('inspecting lot: ');
+      console.info('Inspecting lot: ');
       console.info(util.inspect(listing, { showHidden: false, depth: null }));
 
       if (!highestOffer) {
-        throw new Error('no offers exist');
+        throw new Error('No offers exist');
       }
 
       console.info('============= END : closeBidding ===========');
