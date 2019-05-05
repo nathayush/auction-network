@@ -25,19 +25,6 @@ class FabCar extends Contract {
     async initLedger(ctx) {
         console.info('============= START : Initialize Ledger ===========');
 
-        // let member1 = {};
-        // member1.balance = 5000;
-        // member1.firstName = 'Amy';
-        // member1.lastName = 'Williams';
-
-        // let lot1 = {};
-        // lot1.owner = 'MEM1';
-        // lot1.reservePrice = 3500;
-        // lot1.description = 'Arium Nova';
-        // lot1.listingState = 'FOR_SALE';
-        // lot1.offers = '';
-        // lot1.item = 'item1';
-
         let lotCount = {};
         lotCount.count = 0;
 
@@ -56,21 +43,25 @@ class FabCar extends Contract {
         throw new Error('Incorrect number of arguments. Expecting 4');
       }
 
-      var member = {
-        firstName: firstName,
-        lastName: lastName,
-        balance: balance
-      };
+      let queryAsBytes = await ctx.stub.getState(memberId);
+      if (!queryAsBytes || queryAsBytes.toString().length <= 0) {
+        var member = {
+          firstName: firstName,
+          lastName: lastName,
+          balance: Number(balance)
+        };
 
-      console.info(member);
+        console.info(member);
 
-      await ctx.stub.putState(memberId, Buffer.from(JSON.stringify(member)));
+        await ctx.stub.putState(memberId, Buffer.from(JSON.stringify(member)));
 
-      let countAsBytes = await ctx.stub.getState('memCount');
-      var memCount = JSON.parse(countAsBytes);
-      memCount.count = memCount.count + 1;
-      await ctx.stub.putState('memCount', Buffer.from(JSON.stringify(memCount)));
-
+        let countAsBytes = await ctx.stub.getState('memCount');
+        var memCount = JSON.parse(countAsBytes);
+        memCount.count = memCount.count + 1;
+        await ctx.stub.putState('memCount', Buffer.from(JSON.stringify(memCount)));
+      } else {
+        throw new Error('member id already exists.');
+      }
       console.info('============= END : Add Member to State ===========');
     }
 
@@ -82,7 +73,7 @@ class FabCar extends Contract {
 
       var itemListing = {
         owner: ownerId,
-        reservePrice: reservePrice,
+        reservePrice: Number(reservePrice),
         description: description,
         listingState: 'FOR_SALE',
         offers: null
@@ -223,7 +214,7 @@ class FabCar extends Contract {
       }
 
       var offer = {
-        bidPrice: bid,
+        bidPrice: Number(bid),
         listing: listingId,
         member: memberId
       };
@@ -241,22 +232,24 @@ class FabCar extends Contract {
       //get reference to member to ensure enough balance in their account to make the bid
       let memberAsBytes = await ctx.stub.getState(offer.member);
       if (!memberAsBytes || memberAsBytes.toString().length <= 0) {
-        throw new Error('member does not queryexist');
+        throw new Error('member does not exist');
       }
       let member = JSON.parse(memberAsBytes);
-
-      //check to ensure bidder has enough balance to make the bid
-      if (member.balance < offer.bidPrice) {
-        throw new Error('The bid is higher than the balance in your account!');
-      }
-
-      console.info('offer: ');
-      console.info(util.inspect(offer, { showHidden: false, depth: null }));
+      console.info(offer.bidPrice);
+      console.info(member.balance);
 
       //check to ensure bidder can't bid on own item!
       if (listing.owner == offer.member) {
         throw new Error('owner cannot bid on own item.');
       }
+
+      //check to ensure bidder has enough balance to make the bid
+      if (Number(member.balance) < Number(offer.bidPrice)) {
+        throw new Error('bid is higher than the balance in your account');
+      }
+
+      console.info('offer: ');
+      console.info(util.inspect(offer, { showHidden: false, depth: null }));
 
       console.info('listing response before pushing to offers: ');
       console.info(listing);
@@ -264,7 +257,19 @@ class FabCar extends Contract {
         console.info('there are no offers.');
         listing.offers = [];
       }
-      listing.offers.push(offer);
+
+      var idx = null;
+      listing.offers.forEach(function (value, index) {
+        if (value.member == offer.member) {
+          idx = index;
+        }
+      })
+      if (idx == null) {
+        listing.offers.push(offer);
+      } else {
+        var oldOffer = listing.offers[idx];
+        listing.offers[idx].bidPrice = Number(oldOffer.bidPrice) + Number(offer.bidPrice);
+      }
 
       var result = '';
       if (listing.offers && listing.offers.length > 0) {
@@ -273,19 +278,30 @@ class FabCar extends Contract {
         });
         listing.offers.forEach(function (value, index) {
           if (value.member == offer.member) {
-            result = "rank in this lot's bids: " + (Number(index)+1).toString();
+            result = "Rank in this lot's bids: " + (Number(index)+1).toString();
           }
         });
       }
 
+      let buyerBalance = parseInt(member.balance, 10);
+      let offerPrice = parseInt(offer.bidPrice, 10);
+
+      console.info('#### buyer balance before: ' + buyerBalance);
+      buyerBalance -= offerPrice;
+      member.balance = buyerBalance;
+      console.info('#### buyer balance after: ' + buyerBalance);
+
       console.info('listing response after pushing to offers: ');
       console.info(listing);
       await ctx.stub.putState(listingId, Buffer.from(JSON.stringify(listing)));
+      await ctx.stub.putState(offer.member, Buffer.from(JSON.stringify(member)));
       console.info('============= END : Make Offer ===========');
+
       return result;
+
     }
 
-    async closeBidding(ctx, listingId) {
+    async closeBidding(ctx, listingId, ownerId) {
       console.info('============= START : Close bidding ===========');
       if (listingId == null) {
         throw new Error('Incorrect number of arguments. Expecting 1');
@@ -304,9 +320,32 @@ class FabCar extends Contract {
       console.info('listing: ');
       console.info(util.inspect(listing, { showHidden: false, depth: null }));
       listing.listingState = 'RESERVE_NOT_MET';
+
+      //first return everyone's money in offers
+      if (listing.offers && listing.offers.length > 0) {
+        for (let i=0; i<listing.offers.length; i++) {
+          let offerMember = listing.offers[i].member;
+          let offerBid = listing.offers[i].bidPrice;
+
+          let memAsBytes = await ctx.stub.getState(offerMember);
+          if (!memAsBytes || memAsBytes.toString().length <= 0) {
+            throw new Error('offer member does not exist in the network');
+          }
+          offerMember = JSON.parse(memAsBytes);
+          offerMember.balance += offerBid;
+          console.info(util.inspect(JSON.parse(offerMember), { showHidden: false, depth: null })););
+          await ctx.stub.putState(listing.offers[i].member, Buffer.from(JSON.stringify(offerMember)));
+        }
+      }
+
+      for (let i=0; i<listing.offers.length; i++) {
+        let x = await ctx.stub.getState(listing.offers[i].member);
+        console.log(listing.offers[i].member);
+        console.info(util.inspect(JSON.parse(x), { showHidden: false, depth: null }));
+      }
+
       let highestOffer = null;
       let secondHighestOffer = null;
-
       //can only close bidding if there are offers
       if (listing.offers && listing.offers.length > 1) {
         listing.offers.sort(function (a, b) {
@@ -315,11 +354,11 @@ class FabCar extends Contract {
 
         highestOffer = listing.offers[0];
         secondHighestOffer = listing.offers[1];
-        console.info('highest Offer: ' + highestOffer);
-        console.info('second Highest Offer: ' + secondHighestOffer);
+        console.info('highest offer: ' + highestOffer);
+        console.info('second highest offer: ' + secondHighestOffer);
 
         //bid must be higher than reserve price, otherwise we can sell the car
-        if (highestOffer.bidPrice >= listing.reservePrice) {
+        if (Number(highestOffer.bidPrice) >= Number(listing.reservePrice)) {
           let buyer = highestOffer.member;
           console.info('highestOffer.member: ' + buyer);
 
@@ -357,9 +396,8 @@ class FabCar extends Contract {
 
           console.info('#### seller balance after: ' + seller.balance);
           console.info('#### buyer balance after: ' + buyerBalance);
-          console.info('#### lot owner before: ' + listing.owner);
+          console.info('#### lot owner before: ' + oldOwner);
           console.info('#### lot owner after: ' + listing.owner);
-          console.info('#### buyer balance after: ' + buyerBalance);
           listing.offers = null;
           listing.listingState = 'SOLD';
 
@@ -376,10 +414,10 @@ class FabCar extends Contract {
         });
 
         highestOffer = listing.offers[0];
-        console.info('highest Offer: ' + highestOffer);
+        console.info('highest offer: ' + highestOffer);
 
         //bid must be higher than reserve price, otherwise we can sell the car
-        if (highestOffer.bidPrice >= listing.reservePrice) {
+        if (Number(highestOffer.bidPrice) >= Number(listing.reservePrice)) {
           let buyer = highestOffer.member;
           console.info('highestOffer.member: ' + buyer);
 
@@ -417,9 +455,8 @@ class FabCar extends Contract {
 
           console.info('#### seller balance after: ' + seller.balance);
           console.info('#### buyer balance after: ' + buyerBalance);
-          console.info('#### item owner before: ' + listing.owner);
+          console.info('#### item owner before: ' + oldOwner);
           console.info('#### item owner after: ' + listing.owner);
-          console.info('#### buyer balance after: ' + buyerBalance);
           listing.offers = null;
           listing.listingState = 'SOLD';
 

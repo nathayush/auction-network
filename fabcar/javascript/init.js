@@ -39,7 +39,7 @@ async function main() {
 
         // Submit the specified transaction.
         await contract.submitTransaction('initLedger');
-        console.log('Transaction has been submitted');
+        console.log('Ledger initialized.');
 
         // Disconnect from the gateway.
         await gateway.disconnect();

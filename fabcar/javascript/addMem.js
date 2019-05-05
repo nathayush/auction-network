@@ -22,9 +22,14 @@ const ccpJSON = fs.readFileSync(ccpPath, 'utf8');
 const ccp = JSON.parse(ccpJSON);
 
 let user;
+let fname;
+let lname;
+let balance;
 process.argv.forEach(function (val,index,array) {
-    console.log(index + ': '+ val);
     user = array[2];
+    fname = array[3];
+    lname = array[4];
+    balance = array[5];
 });
 
 async function main() {
@@ -54,11 +59,8 @@ async function main() {
         const contract = network.getContract('fabcar');
 
         // Submit the specified transaction.
-        await contract.submitTransaction('addMemToState', 'Deva', 'Madala', '7000', user);
-        // await contract.submitTransaction('createListing', '200', 'Honda Civic', user);
-        // const result = await contract.submitTransaction('makeOffer', '3000', 'LOT1', user); console.log(`Transaction has been submitted, result is: ${result}`);
-        // await contract.submitTransaction('closeBidding', 'LOT1', user);
-        console.log('Transaction has been submitted');
+        await contract.submitTransaction('addMemToState', fname, lname, balance, user);
+        console.log('Added member.');
 
         // Disconnect from the gateway.
         await gateway.disconnect();
