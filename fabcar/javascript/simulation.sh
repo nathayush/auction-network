@@ -1,4 +1,8 @@
 #!/bin/bash
+node enrollAdmin.js
+node registerUser.js ayush.nath
+node registerUser.js vineet.n
+node registerUser.js deva.m
 node init.js
 node addMem.js ayush.nath Ayush Nath 10000
 node addMem.js vineet.n Vineet Nandkishore 10000
