@@ -34,19 +34,14 @@ node registerUser.js [userId]
 node init.js
 ```
 
-## 5. User adds themselves to the ledger
+## 5. Interact with Application
 
 ```bash
-node addMem.js [userId] [firstName] [lastName] [balance]
+node bidder.js
 ```
+## 6. Open server at http://localhost:3000
 
-## 6.1. User can now invoke further commands
-
-```bash
-node createListing.js [userId] [oneWordDescription] [reservePrice]
-node makeOffer.js [userId] [lotId] [bidPrice]
-node closeBidding.js [userId] [lotId]
-```
+## 6.1 Results will be visible in terminal
 
 ## 6.2. There are some developer functions in query.js
 
