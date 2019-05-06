@@ -7,6 +7,13 @@
 ```bash
 cd fabcar
 ./startFabric.sh javascript
+cd javascript
+```
+
+## To run a simulation
+
+```bash
+./simulation.sh
 ```
 
 ## 2. Enroll the admin
@@ -45,4 +52,11 @@ node closeBidding.js [userId] [lotId]
 
 ```bash
 node query.js [userId]
+```
+
+## To stop the app
+
+```bash
+cd ../../basic-network
+./reset.sh
 ```
