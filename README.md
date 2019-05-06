@@ -1,31 +1,62 @@
 [//]: # (SPDX-License-Identifier: CC-BY-4.0)
 
-## Hyperledger Fabric Samples
+# Running the app through the terminal
 
-Please visit the [installation instructions](http://hyperledger-fabric.readthedocs.io/en/latest/install.html)
-to ensure you have the correct prerequisites installed. Please use the
-version of the documentation that matches the version of the software you
-intend to use to ensure alignment.
-
-## Download Binaries and Docker Images
-
-The [`scripts/bootstrap.sh`](https://github.com/hyperledger/fabric-samples/blob/release-1.3/scripts/bootstrap.sh)
-script will preload all of the requisite docker
-images for Hyperledger Fabric and tag them with the 'latest' tag. Optionally,
-specify a version for fabric, fabric-ca and thirdparty images. Default versions
-are 1.4.0, 1.4.0 and 0.4.14 respectively.
+## 1. Start the fabric nodes and install the chaincode
 
 ```bash
-./scripts/bootstrap.sh [version] [ca version] [thirdparty_version]
+cd fabcar
+./startFabric.sh javascript
+cd javascript
 ```
 
-### Continuous Integration
+## To run a simulation
 
-Please have a look at [Continuous Integration Process](docs/fabric-samples-ci.md)
+```bash
+./simulation.sh
+```
 
-## License <a name="license"></a>
+## 2. Enroll the admin
 
-Hyperledger Project source code files are made available under the Apache
-License, Version 2.0 (Apache-2.0), located in the [LICENSE](LICENSE) file.
-Hyperledger Project documentation files are made available under the Creative
-Commons Attribution 4.0 International License (CC-BY-4.0), available at http://creativecommons.org/licenses/by/4.0/.
+```bash
+node enrollAdmin.js
+```
+
+## 3. Admin registers the users
+
+```bash
+node registerUser.js [userId]
+```
+
+## 4. Admin initializes the ledger
+
+```bash
+node init.js
+```
+
+## 5. User adds themselves to the ledger
+
+```bash
+node addMem.js [userId] [firstName] [lastName] [balance]
+```
+
+## 6.1. User can now invoke further commands
+
+```bash
+node createListing.js [userId] [oneWordDescription] [reservePrice]
+node makeOffer.js [userId] [lotId] [bidPrice]
+node closeBidding.js [userId] [lotId]
+```
+
+## 6.2. There are some developer functions in query.js
+
+```bash
+node query.js [userId]
+```
+
+## To stop the app
+
+```bash
+cd ../../basic-network
+./reset.sh
+```
